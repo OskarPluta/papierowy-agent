@@ -3,19 +3,12 @@ import sympy
 import requests
 
 from typing import Optional
+
+from bs4 import BeautifulSoup
 from langchain_core.tools import tool 
 
 
 class Tools: 
-
-    @staticmethod
-    def validade_url(url: str) -> bool:
-        """
-        Validates if the given string is a valid URL.
-        """
-        if url.startswith("http://") or url.startswith("https://"):
-            return True
-        return False
 
     @tool 
     def fetch_arxiv(query: str, max_results: Optional[int], sort_by: Optional[arxiv.SortCriterion], output_options: Optional[list[str]]) -> str:
@@ -48,20 +41,22 @@ class Tools:
         return str(output)
     
     @tool 
-    def fetch_arxiv_by_id(paper_id: str, output_options: Optional[list[str]]) -> str:
+    def fetch_arxiv_by_id(paper_id: str, output_options: Optional[list[str]]) -> str: # currently full content not implemented
         """Fetches a paper from arXiv based on its ID.
         The paper_id should be in the format "arXiv:xxxx.xxxxx" or "xxxx.xxxxx". For example,
         "arXiv:2101.00001" or "2101.00001".
-        output_options is a list of strings that specifies which fields to include in the output. Possible values are "title", "summary", "authors", "published_date". If output_options is None
+        output_options is a list of strings that specifies which fields to include in the output. Possible values are "title", "summary", "content","authors", "published_date". If output_options is None
         all fields will be included in the output.
         """
         client = arxiv.Client()
         if paper_id.startswith("arXiv:"):
             paper_id = paper_id[6:]
-        search = arxiv.Search(id_list=[paper_id])
+        search = arxiv.Search(id_list=[paper_id], max_results=1)
         results = client.results(search)
         output = []
         for result in results:
+            print(result.comment)
+            print('-------')
             result_dict = {}
             if output_options is None or "title" in output_options:
                 result_dict["title"] = result.title
@@ -72,6 +67,9 @@ class Tools:
             if output_options is None or "published_date" in output_options:
                 result_dict["published_date"] = result.published.date()
             output.append(result_dict)
+        return str(output)
+    
+    
 
 
     @tool
@@ -123,3 +121,27 @@ class Tools:
         except Exception as e:
             return f"Error: {e}"
         
+
+    @staticmethod
+    def clean_html_to_text(html: str) -> str:
+        """
+        Cleans the given HTML content and returns the plain text.
+        """
+        soup = BeautifulSoup(html, "html.parser")
+        for tag in soup(["script", "style", "nav", "header", "footer"]):
+            tag.decompose()
+
+        text = soup.get_text(separator="\n")
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+
+        return "\n".join(lines)
+
+
+    @staticmethod
+    def validade_url(url: str) -> bool:
+        """
+        Validates if the given string is a valid URL.
+        """
+        if url.startswith("http://") or url.startswith("https://"):
+            return True
+        return False
